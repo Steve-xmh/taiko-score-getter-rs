@@ -28,7 +28,7 @@ pub async fn install_cert() {
     if !p.status.success() {
         panic!("证书安装失败");
     }
-    
+
     tracing::warn!("证书已安装成功，还有最后一步信任证书需要操作：");
     tracing::warn!("  1. 打开 钥匙串访问 程序，找到 Taiko Score Getter Certificate 证书");
     tracing::warn!("  2. 在右上角搜索 Taiko Score Getter Certificate 证书，并双击打开搜索到的证书");

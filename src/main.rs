@@ -9,18 +9,28 @@ use http_body_util::BodyExt;
 use hudsucker::{rustls::crypto::aws_lc_rs, HttpHandler};
 use os::ProxyConfigs;
 mod os;
+mod songs_score;
 
 type OneShotSender = tokio::sync::mpsc::Sender<()>;
+
+#[derive(Debug, Clone, Copy)]
+enum UriType {
+    FetchScore,
+    TaikoSongScore,
+}
 
 #[derive(Debug, Clone)]
 struct Handler {
     fetch_score: Uri,
     taiko_songsscore: Uri,
 
-    current_uri: Option<Uri>,
+    current_uri_type: Option<UriType>,
     fetched_score_response: Arc<tokio::sync::Mutex<Option<String>>>,
     finished_sx: Option<OneShotSender>,
 }
+
+// https://www.baidu.com:443/api/ahfsdafbaqwerhue
+// https://wl-taiko.wahlap.net:443/api/user/profile/songscore
 
 impl Handler {
     pub fn new(sx: OneShotSender) -> Self {
@@ -33,7 +43,7 @@ impl Handler {
         Self {
             fetch_score,
             taiko_songsscore,
-            current_uri: None,
+            current_uri_type: None,
             fetched_score_response: Default::default(),
             finished_sx: Some(sx),
         }
@@ -46,51 +56,98 @@ impl HttpHandler for Handler {
         _ctx: &hudsucker::HttpContext,
         res: hudsucker::hyper::Response<hudsucker::Body>,
     ) -> hudsucker::hyper::Response<hudsucker::Body> {
-        if self.current_uri.as_ref() == Some(&self.taiko_songsscore) {
-            tracing::info!("正在解析分数数据响应数据");
-            let res = hudsucker::decode_response(res).expect("解析分数响应数据失败");
+        match self.current_uri_type {
+            Some(UriType::FetchScore) => {
+                if let Some(fetched_score_response) =
+                    self.fetched_score_response.lock().await.as_ref()
+                {
+                    tracing::info!("监测到同步接口请求，正在转发捕获到的分数数据");
+                    let fetched_score_response = fetched_score_response.clone();
 
-            let (parts, body) = res.into_parts();
+                    if let Some(sx) = self.finished_sx.take() {
+                        tokio::spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                            sx.send(()).await.unwrap();
+                        });
+                    }
 
-            let body = body.collect().await.unwrap().to_bytes();
+                    return hudsucker::hyper::Response::builder()
+                        .header("Content-Type", "application/json")
+                        .header("X-Data-Fetched", "1")
+                        .status(200)
+                        .version(res.version())
+                        .body(hudsucker::Body::from(fetched_score_response))
+                        .unwrap();
+                } else {
+                    tracing::warn!("监测到同步接口请求，但是并没有获取到任何分数数据，请先从鼓众广场小程序中点击我的分数查询！");
+                };
+            }
+            Some(UriType::TaikoSongScore) => {
+                tracing::info!("正在解析分数数据响应数据");
+                let res = hudsucker::decode_response(res).expect("解析分数响应数据失败");
 
-            // println!("成功捕获到分数数据 {:?}", body);
-            tracing::info!("成功捕获到分数数据，大小为 {}", body.len());
+                let (parts, body) = res.into_parts();
 
-            let cloned_body = http_body_util::Full::new(body.clone());
+                let body = body.collect().await.unwrap().to_bytes();
 
-            *self.fetched_score_response.lock().await =
-                Some(String::from_utf8_lossy(&body).into_owned());
+                // println!("成功捕获到分数数据 {:?}", body);
+                tracing::info!("成功捕获到分数数据，大小为 {}", body.len());
 
-            self.current_uri = None;
+                let cloned_body = http_body_util::Full::new(body.clone());
 
-            return Response::from_parts(parts, cloned_body.into());
-        } else if self.current_uri.as_ref() == Some(&self.fetch_score) {
-            if let Some(fetched_score_response) = self.fetched_score_response.lock().await.as_ref()
-            {
-                tracing::info!("监测到同步接口请求，正在转发捕获到的分数数据");
-                let fetched_score_response = fetched_score_response.clone();
+                // let data_body = String::from_utf8_lossy(&body).into_owned();
 
-                if let Some(sx) = self.finished_sx.take() {
-                    tokio::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                        sx.send(()).await.unwrap();
-                    });
+                // tokio::fs::write("score.json", &data_body).await.unwrap();
+
+                match serde_json::from_slice::<songs_score::Response>(&body) {
+                    Ok(score_data) => {
+                        tracing::info!("分数响应数据解析成功，正在生成需要返回的数据");
+
+                        if score_data.status == 0 {
+                            let mut result = Vec::with_capacity(score_data.data.score_info.len());
+
+                            for item in score_data.data.score_info {
+                                result.push(serde_json::Value::Array(Vec::from([
+                                    item.song_no.into(),
+                                    item.level.into(),
+                                    item.high_score.into(),
+                                    item.best_score_rank.into(),
+                                    item.good_cnt.into(),
+                                    item.ok_cnt.into(),
+                                    item.ng_cnt.into(),
+                                    item.pound_cnt.into(),
+                                    item.combo_cnt.into(),
+                                    item.stage_cnt.into(),
+                                    item.clear_cnt.into(),
+                                    item.full_combo_cnt.into(),
+                                    item.dondaful_combo_cnt.into(),
+                                    item.update_datetime.into(),
+                                ])));
+                            }
+
+                            self.fetched_score_response
+                                .lock()
+                                .await
+                                .replace(serde_json::to_string(&result).unwrap());
+                        } else {
+                            tracing::warn!("分数数据返回状态码不为 0，可能是未登录或者其他错误，响应的错误信息为：{}", score_data.message);
+                        }
+                    }
+                    Err(err) => {
+                        tracing::error!("解析分数数据失败：{}", err);
+                    }
                 }
 
-                return hudsucker::hyper::Response::builder()
-                    .header("Content-Type", "applicaiton/json")
-                    .header("X-Data-Fetched", "1")
-                    .status(200)
-                    .version(res.version())
-                    .body(fetched_score_response.into())
-                    .unwrap();
-            } else {
-                tracing::warn!("监测到同步接口请求，但是并没有获取到任何分数数据，请先从鼓众广场小程序中点击我的分数查询！");
-            };
+                self.current_uri_type = None;
+
+                return Response::from_parts(parts, cloned_body.into());
+            }
+            None => {
+                return res;
+            }
         }
 
-        self.current_uri = None;
+        self.current_uri_type = None;
         res
     }
 
@@ -99,12 +156,14 @@ impl HttpHandler for Handler {
         _ctx: &hudsucker::HttpContext,
         req: http::Request<hudsucker::Body>,
     ) -> hudsucker::RequestOrResponse {
-        self.current_uri = Some(req.uri().clone());
-
-        if req.uri() == &self.taiko_songsscore && req.method() == Method::POST {
+        if req.uri().host() == self.taiko_songsscore.host() && req.method() == Method::POST {
             tracing::debug!("检测到分数接口请求");
-        } else if req.uri() == &self.fetch_score && req.method() == Method::GET {
+            self.current_uri_type = Some(UriType::TaikoSongScore);
+        } else if req.uri().host() == self.fetch_score.host() && req.method() == Method::GET {
             tracing::debug!("检测到成绩同步接口请求");
+            self.current_uri_type = Some(UriType::FetchScore);
+        } else {
+            self.current_uri_type = None;
         }
 
         req.into()
@@ -119,7 +178,11 @@ pub fn get_config_dir() -> PathBuf {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .compact()
+        .init();
+
     let listen_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 7650);
     let (sx, mut rx) = tokio::sync::mpsc::channel(1);
 

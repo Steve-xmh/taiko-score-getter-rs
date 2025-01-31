@@ -1,6 +1,13 @@
 use hudsucker::{certificate_authority::RcgenAuthority, rcgen::*, rustls::crypto::aws_lc_rs};
 
 // TODO: 其他系统支持
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+pub use windows::ProxyConfigs;
+#[cfg(target_os = "windows")]
+use windows::*;
+
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
