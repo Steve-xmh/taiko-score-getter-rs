@@ -1,0 +1,22 @@
+[package]
+name = "taiko-score-getter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "*", features = ["rt-multi-thread", "full"] }
+hudsucker = { version = "0.23", features = ["native-tls-client"] }
+hyper-tls = "*"
+time = "*"
+dirs = "6.0.0"
+http = "*"
+http-body-util = "0.1.2"
+tracing = "*"
+tracing-subscriber = "*"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
