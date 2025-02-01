@@ -1,13 +1,17 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
     sync::Arc,
 };
 
+use gui::{send_msg_to_gui, GuiMessage};
 use http::{Method, Response, Uri};
 use http_body_util::BodyExt;
 use hudsucker::{rustls::crypto::aws_lc_rs, HttpHandler};
 use os::ProxyConfigs;
+mod gui;
 mod os;
 mod songs_score;
 
@@ -65,11 +69,14 @@ impl HttpHandler for Handler {
                     let fetched_score_response = fetched_score_response.clone();
 
                     if let Some(sx) = self.finished_sx.take() {
-                        tokio::spawn(async move {
-                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                            sx.send(()).await.unwrap();
-                        });
+                        // tokio::spawn(async move {
+                        //     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                        //     sx.send(()).await.unwrap();
+                        // });
+                        sx.send(()).await.unwrap();
                     }
+
+                    send_msg_to_gui(GuiMessage::SendingScoreData);
 
                     return hudsucker::hyper::Response::builder()
                         .header("Content-Type", "application/json")
@@ -129,6 +136,8 @@ impl HttpHandler for Handler {
                                 .lock()
                                 .await
                                 .replace(serde_json::to_string(&result).unwrap());
+
+                            send_msg_to_gui(GuiMessage::WaitForScoreSync);
                         } else {
                             tracing::warn!("分数数据返回状态码不为 0，可能是未登录或者其他错误，响应的错误信息为：{}", score_data.message);
                         }
@@ -186,6 +195,9 @@ async fn main() {
     let listen_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 7650);
     let (sx, mut rx) = tokio::sync::mpsc::channel(1);
 
+    gui::init_gui(sx.clone());
+    send_msg_to_gui(GuiMessage::Init);
+
     let proxy_configs = ProxyConfigs::new().await;
     proxy_configs
         .set_proxy(listen_addr.ip().to_string(), listen_addr.port())
@@ -199,6 +211,7 @@ async fn main() {
         .with_rustls_client(aws_lc_rs::default_provider())
         .with_http_handler(Handler::new(sx))
         .with_graceful_shutdown(async move {
+            send_msg_to_gui(GuiMessage::WaitForScoreData);
             tracing::info!("代理服务器已启动！");
 
             tokio::select! {
@@ -206,7 +219,7 @@ async fn main() {
                     v.expect("Failed to install CTRL+C signal handler");
                 },
                 _ = rx.recv() => {
-                    tracing::info!("已完成成绩同步，准备关闭程序");
+                    tracing::info!("接收到关闭请求，准备关闭程序");
                 }
             };
 
@@ -216,6 +229,8 @@ async fn main() {
         .unwrap();
 
     proxy.start().await.unwrap();
+
+    send_msg_to_gui(GuiMessage::Close);
 
     tracing::info!("正在还原代理配置");
     proxy_configs.recover().await;
