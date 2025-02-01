@@ -5,6 +5,7 @@ pub async fn is_cert_installed() -> bool {
         .arg("-verifystore")
         .arg("root")
         .arg("Taiko Score Getter Certificate")
+        .creation_flags(0x08000000)
         .output()
         .await
         .expect("无法检查证书是否已安装");
@@ -21,6 +22,7 @@ pub async fn install_cert() {
         .arg("-addstore")
         .arg("root")
         .arg(cer_path)
+        .creation_flags(0x08000000)
         .status()
         .await
         .expect("无法安装证书");
