@@ -1,7 +1,7 @@
 use cacao::{
     appkit::{
         menu::{Menu, MenuItem},
-        window::{Window, WindowConfig, WindowDelegate},
+        window::{Window, WindowConfig, WindowDelegate, WindowStyle},
         App, AppDelegate,
     },
     color::Color,
@@ -62,10 +62,11 @@ impl WindowDelegate for MainWindowDelegate {
         self.content.add_subview(&self.label_description);
 
         LayoutConstraint::activate(&[
+            self.content.width.constraint_equal_to_constant(350.0),
             self.label_launch_proxy
                 .top
                 .constraint_equal_to(&self.content.top)
-                .offset(30.0),
+                .offset(0.0),
             self.label_launch_proxy
                 .leading
                 .constraint_equal_to(&self.content.leading)
@@ -128,7 +129,6 @@ impl AppDelegate for StatusApp {
 
         App::activate();
 
-        self.window.set_content_size(560, 115);
         self.window.set_titlebar_appears_transparent(true);
         self.window.show();
         self.window.set_title("Taiko Score Getter 太鼓成绩获取工具");
@@ -193,12 +193,19 @@ pub fn gui_main(
             cacao::appkit::App::<StatusApp, GuiMessage>::dispatch_main(msg);
         }
     });
+    
+    let mut win_cfg = WindowConfig::default();
+    
+    win_cfg.set_styles(&[
+        WindowStyle::Closable,
+        WindowStyle::Titled,
+    ]);
 
     App::new(
         "net.stevexmh.taikoscoregetter",
         StatusApp {
             window: Window::with(
-                WindowConfig::default(),
+                win_cfg,
                 MainWindowDelegate {
                     close_sx,
                     label_launch_proxy: Label::default(),

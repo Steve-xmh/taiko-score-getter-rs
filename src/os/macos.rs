@@ -18,7 +18,7 @@ pub async fn install_cert() {
     let p = tokio::process::Command::new("osascript")
     .arg("-e")
     .arg(format!(
-        r#"do shell script "security authorizationdb write com.apple.trust-settings.admin allow ; sudo security add-trusted-cert -d -r trustRoot -p ssl -p basic -k /Library/Keychains/System.keychain \"{}\" ; security authorizationdb remove com.apple.trust-settings.admin" with prompt "太鼓成绩提取器需要安装代理证书" with administrator privileges"#,
+        r#"do shell script "security authorizationdb write com.apple.trust-settings.admin allow ; security add-trusted-cert -d -r trustAsRoot -p ssl -p basic -s \"localhost\" -k /Library/Keychains/System.keychain \"{}\" ; security authorizationdb remove com.apple.trust-settings.admin" with prompt "太鼓成绩提取器需要安装代理证书" with administrator privileges"#,
         cer_path.as_path().to_string_lossy()
     ))
     .output()
