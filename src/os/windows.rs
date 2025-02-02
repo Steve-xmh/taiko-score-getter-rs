@@ -38,7 +38,12 @@ pub struct ProxyConfigs {
 impl ProxyConfigs {
     pub async fn new() -> Self {
         Self {
-            last_proxy: Sysproxy::get_system_proxy().expect("无法获取系统代理配置"),
+            last_proxy: Sysproxy::get_system_proxy().unwrap_or(Sysproxy {
+                enable: false,
+                host: "".into(),
+                port: 0,
+                bypass: "".into(),
+            }),
         }
     }
 

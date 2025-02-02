@@ -12,7 +12,7 @@ dirs = "6.0.0"
 http = "*"
 http-body-util = "0.1.2"
 tracing = "*"
-tracing-subscriber = "*"
+tracing-subscriber = { version = "*", features = ["env-filter"] }
 sysproxy = "0.3.0"
 
 serde = { version = "1.0", features = ["derive"] }

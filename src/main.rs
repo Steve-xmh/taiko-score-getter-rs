@@ -1,4 +1,7 @@
-#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -166,7 +169,7 @@ impl HttpHandler for Handler {
         req: http::Request<hudsucker::Body>,
     ) -> hudsucker::RequestOrResponse {
         if req.uri().host() == self.taiko_songsscore.host() && req.method() == Method::POST {
-            tracing::debug!("检测到分数接口请求");
+            tracing::debug!("检测到分数接口请求: {}", req.uri());
             self.current_uri_type = Some(UriType::TaikoSongScore);
         } else if req.uri().host() == self.fetch_score.host() && req.method() == Method::GET {
             tracing::debug!("检测到成绩同步接口请求");
@@ -176,6 +179,14 @@ impl HttpHandler for Handler {
         }
 
         req.into()
+    }
+
+    async fn should_intercept(
+        &mut self,
+        _ctx: &hudsucker::HttpContext,
+        req: &http::Request<hudsucker::Body>,
+    ) -> bool {
+        true
     }
 }
 
@@ -189,6 +200,8 @@ pub fn get_config_dir() -> PathBuf {
 async fn main() {
     tracing_subscriber::fmt()
         .with_target(false)
+        .without_time()
+        .with_env_filter("taiko_score_getter=info")
         .compact()
         .init();
 
