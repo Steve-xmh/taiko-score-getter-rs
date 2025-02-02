@@ -7,6 +7,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
     sync::Arc,
+    time::Duration,
 };
 
 use gui::{send_msg_to_gui, GuiMessage};
@@ -14,6 +15,7 @@ use http::{Method, Response, Uri};
 use http_body_util::BodyExt;
 use hudsucker::{rustls::crypto::aws_lc_rs, HttpHandler};
 use os::ProxyConfigs;
+use tokio::sync::mpsc::{Receiver, Sender};
 mod gui;
 mod os;
 mod songs_score;
@@ -72,11 +74,10 @@ impl HttpHandler for Handler {
                     let fetched_score_response = fetched_score_response.clone();
 
                     if let Some(sx) = self.finished_sx.take() {
-                        // tokio::spawn(async move {
-                        //     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                        //     sx.send(()).await.unwrap();
-                        // });
-                        sx.send(()).await.unwrap();
+                        tokio::spawn(async move {
+                            tokio::time::sleep(Duration::from_secs(3)).await;
+                            sx.send(()).await.unwrap();
+                        });
                     }
 
                     send_msg_to_gui(GuiMessage::SendingScoreData);
@@ -196,19 +197,9 @@ pub fn get_config_dir() -> PathBuf {
         .join("taiko-score-getter")
 }
 
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .without_time()
-        .with_env_filter("taiko_score_getter=info")
-        .compact()
-        .init();
-
+async fn proxy_main(sx: Sender<()>, mut rx: Receiver<()>) {
     let listen_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 7650);
-    let (sx, mut rx) = tokio::sync::mpsc::channel(1);
 
-    gui::init_gui(sx.clone());
     send_msg_to_gui(GuiMessage::Init);
 
     let proxy_configs = ProxyConfigs::new().await;
@@ -247,4 +238,27 @@ async fn main() {
 
     tracing::info!("正在还原代理配置");
     proxy_configs.recover().await;
+
+    #[cfg(target_os = "macos")]
+    {
+        cacao::appkit::App::terminate();
+    }
+}
+
+fn main() {
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .without_time()
+        .with_env_filter("taiko_score_getter=info")
+        .compact()
+        .init();
+
+    let (sx, rx) = tokio::sync::mpsc::channel(1);
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("无法创建异步运行时环境");
+
+    rt.spawn(proxy_main(sx.clone(), rx));
+    gui::init_gui(rt.handle(), sx);
 }

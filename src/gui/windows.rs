@@ -1,6 +1,9 @@
 use std::sync::{Arc, Mutex};
 
-use tokio::sync::mpsc::{Sender, UnboundedReceiver};
+use tokio::{
+    runtime::Handle,
+    sync::mpsc::{Sender, UnboundedReceiver},
+};
 use winsafe::{
     co::{BKMODE, WS_EX},
     gui::*,
@@ -35,7 +38,11 @@ impl LabelColor {
 
 type LabelColorRef = Arc<Mutex<LabelColor>>;
 
-pub fn gui_main(close_sx: Sender<()>, mut gui_rx: UnboundedReceiver<super::GuiMessage>) {
+pub fn gui_main(
+    handle: &Handle,
+    close_sx: Sender<()>,
+    mut gui_rx: UnboundedReceiver<super::GuiMessage>,
+) {
     let win = WindowMain::new(WindowMainOpts {
         class_name: "TaikoScoreGetter".to_string(),
         title: "Taiko Score Getter 太鼓成绩获取工具".to_string(),
@@ -288,8 +295,6 @@ pub fn gui_main(close_sx: Sender<()>, mut gui_rx: UnboundedReceiver<super::GuiMe
             }
         }
     });
-
-    println!("Running main loop");
 
     win.run_main(None).unwrap();
 }
