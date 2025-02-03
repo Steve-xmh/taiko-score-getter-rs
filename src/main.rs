@@ -170,7 +170,10 @@ impl HttpHandler for Handler {
         _ctx: &hudsucker::HttpContext,
         req: http::Request<hudsucker::Body>,
     ) -> hudsucker::RequestOrResponse {
-        if req.uri().host() == self.taiko_songsscore.host() && req.method() == Method::POST {
+        if req.uri().host() == self.taiko_songsscore.host()
+            && req.uri().path_and_query() == self.taiko_songsscore.path_and_query()
+            && req.method() == Method::POST
+        {
             tracing::debug!("检测到分数接口请求: {}", req.uri());
             self.current_uri_type = Some(UriType::TaikoSongScore);
         } else if req.uri().host() == self.fetch_score.host() && req.method() == Method::GET {
@@ -253,7 +256,7 @@ fn main() {
         .init();
 
     let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_io()
+        .enable_all()
         .build()
         .expect("无法创建异步运行时环境");
 
