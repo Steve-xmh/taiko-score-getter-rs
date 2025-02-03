@@ -43,6 +43,7 @@ pub fn gui_main(
     close_sx: Sender<()>,
     mut gui_rx: UnboundedReceiver<super::GuiMessage>,
 ) {
+    tracing::info!("正在初始化 GUI 窗口……");
     let win = WindowMain::new(WindowMainOpts {
         class_name: "TaikoScoreGetter".to_string(),
         title: "Taiko Score Getter 太鼓成绩获取工具".to_string(),
@@ -198,6 +199,9 @@ pub fn gui_main(
                                 Ok(())
                             }
                         });
+                    }
+                    super::GuiMessage::CertTrustNeeded => {
+                        // 一般不会出现需要验证证书信任的这个情况
                     }
                     // super::GuiMessage::InitError(_msg) => {
                     //     // TODO: 显示点什么？

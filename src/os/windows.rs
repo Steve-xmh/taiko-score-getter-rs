@@ -15,17 +15,16 @@ pub async fn is_cert_installed() -> bool {
 
 pub async fn is_cert_trusted() -> bool {
     // TODO: 证书信任检查
-    // let p = tokio::process::Command::new("certutil")
-    //     .arg("-store")
-    //     .arg("root")
-    //     .arg("Taiko Score Getter Certificate")
-    //     .creation_flags(0x08000000)
-    //     .output()
-    //     .await
-    //     .expect("无法检查证书是否已信任");
+    let p = tokio::process::Command::new("certutil")
+        .arg("-store")
+        .arg("root")
+        .arg("Taiko Score Getter Certificate")
+        .creation_flags(0x08000000)
+        .output()
+        .await
+        .expect("无法检查证书是否已信任");
 
-    // p.status.success()
-    true
+    p.status.success()
 }
 
 pub async fn install_cert() {

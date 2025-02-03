@@ -254,12 +254,15 @@ fn main() {
         .compact()
         .init();
 
-    let (sx, rx) = tokio::sync::mpsc::channel(1);
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .expect("无法创建异步运行时环境");
 
-    rt.spawn(proxy_main(sx.clone(), rx));
+    let _guard = rt.enter();
+    let (sx, rx) = tokio::sync::mpsc::channel(1);
+    let task = rt.spawn(proxy_main(sx.clone(), rx));
+
     gui::init_gui(rt.handle(), sx);
+    rt.block_on(task).unwrap();
 }
