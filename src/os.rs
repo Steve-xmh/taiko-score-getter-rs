@@ -1,4 +1,4 @@
-use hudsucker::{certificate_authority::RcgenAuthority, rcgen::*, rustls::crypto::aws_lc_rs};
+use hudsucker::{certificate_authority::RcgenAuthority, rcgen::*};
 
 // TODO: 其他系统支持
 #[cfg(target_os = "windows")]
@@ -110,5 +110,10 @@ pub async fn get_ca() -> RcgenAuthority {
         }
     }
 
-    RcgenAuthority::new(key_pair, cert, 1000, aws_lc_rs::default_provider())
+    RcgenAuthority::new(
+        key_pair,
+        cert,
+        1000,
+        rustls::crypto::ring::default_provider(),
+    )
 }

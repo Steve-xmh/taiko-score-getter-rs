@@ -13,7 +13,7 @@ use std::{
 use gui::{send_msg_to_gui, GuiMessage};
 use http::{Method, Response, Uri};
 use http_body_util::BodyExt;
-use hudsucker::{rustls::crypto::aws_lc_rs, HttpHandler};
+use hudsucker::HttpHandler;
 use os::ProxyConfigs;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -205,7 +205,7 @@ async fn proxy_main(sx: Sender<()>, mut rx: Receiver<()>) {
     let proxy = hudsucker::Proxy::builder()
         .with_addr(listen_addr)
         .with_ca(os::get_ca().await)
-        .with_rustls_client(aws_lc_rs::default_provider())
+        .with_rustls_client(rustls::crypto::ring::default_provider())
         .with_http_handler(Handler::new(sx))
         .with_graceful_shutdown(async move {
             send_msg_to_gui(GuiMessage::WaitForScoreData);

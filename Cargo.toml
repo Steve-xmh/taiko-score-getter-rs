@@ -12,6 +12,7 @@ tokio = { version = "*", features = [
 ] }
 hudsucker = { version = "0.23", features = [] }
 hyper-tls = "*"
+rustls = { version = "*", default-features = false, features = ["ring"] }
 time = "*"
 dirs = "6.0.0"
 http = "*"
