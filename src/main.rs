@@ -16,6 +16,7 @@ use http_body_util::BodyExt;
 use hudsucker::{rustls::crypto::aws_lc_rs, HttpHandler};
 use os::ProxyConfigs;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod gui;
 mod os;
 mod songs_score;
@@ -181,14 +182,6 @@ impl HttpHandler for Handler {
 
         req.into()
     }
-
-    async fn should_intercept(
-        &mut self,
-        _ctx: &hudsucker::HttpContext,
-        req: &http::Request<hudsucker::Body>,
-    ) -> bool {
-        true
-    }
 }
 
 pub fn get_config_dir() -> PathBuf {
@@ -247,15 +240,20 @@ async fn proxy_main(sx: Sender<()>, mut rx: Receiver<()>) {
 }
 
 fn main() {
-    tracing_subscriber::fmt()
+    let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(false)
         .without_time()
-        .with_env_filter("taiko_score_getter=info")
-        .compact()
+        .compact();
+    let filter =
+        tracing_subscriber::filter::filter_fn(|x| x.target().starts_with("taiko_score_getter"));
+
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt_layer)
         .init();
 
     let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
+        .enable_io()
         .build()
         .expect("无法创建异步运行时环境");
 

@@ -39,7 +39,7 @@ impl LabelColor {
 type LabelColorRef = Arc<Mutex<LabelColor>>;
 
 pub fn gui_main(
-    handle: &Handle,
+    _handle: &Handle,
     close_sx: Sender<()>,
     mut gui_rx: UnboundedReceiver<super::GuiMessage>,
 ) {

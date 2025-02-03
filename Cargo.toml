@@ -4,15 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "*", features = ["rt-multi-thread", "full"] }
-hudsucker = { version = "0.23", features = ["native-tls-client"] }
+tokio = { version = "*", features = [
+    "rt-multi-thread",
+    "fs",
+    "process",
+    "sync",
+] }
+hudsucker = { version = "0.23", features = [] }
 hyper-tls = "*"
 time = "*"
 dirs = "6.0.0"
 http = "*"
 http-body-util = "0.1.2"
 tracing = "*"
-tracing-subscriber = { version = "*", features = ["env-filter"] }
+tracing-subscriber = "*"
 sysproxy = "0.3.0"
 
 serde = { version = "1.0", features = ["derive"] }
@@ -28,7 +33,11 @@ ico-builder = "0.1.1"
 cacao = "^0.3.2"
 objc2 = "^0.6"
 objc2-foundation = { version = "^0.3", features = ["NSData", "NSURL"] }
-objc2-app-kit = { version = "^0.3", features = ["NSImage", "NSResponder", "NSApplication"] }
+objc2-app-kit = { version = "^0.3", features = [
+    "NSImage",
+    "NSResponder",
+    "NSApplication",
+] }
 
 [profile.release]
 strip = true

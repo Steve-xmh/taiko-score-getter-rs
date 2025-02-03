@@ -22,7 +22,7 @@ pub async fn is_cert_trusted() -> bool {
         .output()
         .await
         .expect("无法检查证书是否已信任");
-    
+
     p.status.success()
 }
 
