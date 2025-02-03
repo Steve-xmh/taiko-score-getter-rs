@@ -4,6 +4,14 @@
 
 目前已测试的平台有 Windows 和 macOS 平台，Linux 尚未测试（大概率不支持）。
 
+<div align=center>
+
+<img width=584 alt="Windows 工具截图" src="https://github.com/user-attachments/assets/e7a40e5d-9a43-4fa5-962a-091de074816b" />
+
+<img width=462 alt="macOS 工具截图" src="https://github.com/user-attachments/assets/91868e88-ff21-4948-8998-5679e1830948" />
+
+</div>
+
 ## 和[原版](https://github.com/donnote/taiko_score_getter_cn)的差别
 
 本程序使用 Rust 语言编写，在保持基本功能可用的情况下：
