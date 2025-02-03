@@ -4,6 +4,7 @@ use cacao::{
         window::{Window, WindowConfig, WindowDelegate, WindowStyle},
         App, AppDelegate,
     },
+    button::Button,
     color::Color,
     layout::{Layout, LayoutConstraint},
     notification_center::Dispatcher,
@@ -11,7 +12,8 @@ use cacao::{
     view::View,
 };
 use objc2::{AllocAnyThread, MainThreadMarker};
-use objc2_app_kit::{NSApplication, NSImage};
+use objc2_app_kit::{NSApplication, NSImage, NSWorkspace};
+use objc2_foundation::NSString;
 use tokio::{
     runtime::Handle,
     sync::mpsc::{Sender, UnboundedReceiver},
@@ -20,28 +22,68 @@ use tokio::{
 use crate::gui::GuiMessage;
 
 #[derive(Debug)]
-struct StatusApp {
+pub struct MainApp {
     window: Window<MainWindowDelegate>,
 }
 
+impl MainApp {
+    pub fn new(close_sx: Sender<()>) -> Self {
+        let mut main_win_cfg = WindowConfig::default();
+
+        main_win_cfg.set_styles(&[WindowStyle::Closable, WindowStyle::Titled]);
+
+        let mut cert_guide_win_cfg = WindowConfig::default();
+
+        cert_guide_win_cfg.set_styles(&[
+            WindowStyle::Closable,
+            WindowStyle::Titled,
+            WindowStyle::Resizable,
+            WindowStyle::DocModalWindow,
+        ]);
+
+        Self {
+            window: Window::with(main_win_cfg, MainWindowDelegate::new(close_sx)),
+        }
+    }
+}
+
 #[derive(Debug)]
-struct MainWindowDelegate {
+pub struct MainWindowDelegate {
     close_sx: Sender<()>,
 
     content: View,
 
     label_launch_proxy: Label,
+    label_wait_cert_trust: Label,
     label_receive_score: Label,
     label_sync_score: Label,
 
     label_description: Label,
+    button_trust_guide: Button,
 }
 
 impl MainWindowDelegate {
+    pub fn new(close_sx: Sender<()>) -> Self {
+        Self {
+            close_sx,
+
+            content: Default::default(),
+
+            label_launch_proxy: Default::default(),
+            label_wait_cert_trust: Default::default(),
+            label_receive_score: Default::default(),
+            label_sync_score: Default::default(),
+
+            label_description: Default::default(),
+            button_trust_guide: Button::new("证书信任指南"),
+        }
+    }
+
     fn layout(&self) {
         self.label_launch_proxy.set_text("1. 初始化代理服务器");
-        self.label_receive_score.set_text("2. 等待接收分数数据");
-        self.label_sync_score.set_text("3. 等待同步分数操作");
+        self.label_wait_cert_trust.set_text("2. 检查证书信任情况");
+        self.label_receive_score.set_text("3. 等待接收分数数据");
+        self.label_sync_score.set_text("4. 等待同步分数操作");
 
         self.label_launch_proxy.set_text_color(Color::SystemBlue);
 
@@ -58,13 +100,27 @@ impl WindowDelegate for MainWindowDelegate {
     fn did_load(&mut self, window: Window) {
         window.set_content_view(&self.content);
 
+        self.content.add_subview(&self.button_trust_guide);
         self.content.add_subview(&self.label_launch_proxy);
+        self.content.add_subview(&self.label_wait_cert_trust);
         self.content.add_subview(&self.label_receive_score);
         self.content.add_subview(&self.label_sync_score);
         self.content.add_subview(&self.label_description);
 
+        self.button_trust_guide.set_action(|| {
+            // open url
+            unsafe {
+                let url = objc2_foundation::NSURL::URLWithString(&NSString::from_str(
+                    "https://github.com/Steve-xmh/taiko-score-getter-rs/blob/main/MACOS.md",
+                ))
+                .expect("无法创建 NSURL 对象");
+                NSWorkspace::sharedWorkspace().openURL(&url);
+            }
+        });
+
         LayoutConstraint::activate(&[
             self.content.width.constraint_equal_to_constant(350.0),
+            //
             self.label_launch_proxy
                 .top
                 .constraint_equal_to(&self.content.top)
@@ -77,9 +133,27 @@ impl WindowDelegate for MainWindowDelegate {
                 .trailing
                 .constraint_equal_to(&self.content.trailing)
                 .offset(-10.0),
-            self.label_receive_score
+            //
+            self.label_wait_cert_trust
                 .top
                 .constraint_equal_to(&self.label_launch_proxy.bottom)
+                .offset(10.0),
+            self.label_wait_cert_trust
+                .leading
+                .constraint_equal_to(&self.content.leading)
+                .offset(10.0),
+            //
+            self.button_trust_guide
+                .leading
+                .constraint_equal_to(&self.label_wait_cert_trust.trailing)
+                .offset(10.0),
+            self.button_trust_guide
+                .center_y
+                .constraint_equal_to(&self.label_wait_cert_trust.center_y),
+            //
+            self.label_receive_score
+                .top
+                .constraint_equal_to(&self.label_wait_cert_trust.bottom)
                 .offset(10.0),
             self.label_receive_score
                 .leading
@@ -89,6 +163,7 @@ impl WindowDelegate for MainWindowDelegate {
                 .trailing
                 .constraint_equal_to(&self.content.trailing)
                 .offset(-10.0),
+            //
             self.label_sync_score
                 .top
                 .constraint_equal_to(&self.label_receive_score.bottom)
@@ -101,6 +176,7 @@ impl WindowDelegate for MainWindowDelegate {
                 .trailing
                 .constraint_equal_to(&self.content.trailing)
                 .offset(-10.0),
+            //
             self.label_description
                 .top
                 .constraint_equal_to(&self.label_sync_score.bottom)
@@ -125,7 +201,7 @@ impl WindowDelegate for MainWindowDelegate {
     }
 }
 
-impl AppDelegate for StatusApp {
+impl AppDelegate for MainApp {
     fn did_finish_launching(&self) {
         App::set_menu(vec![Menu::new("Taiko Score Getter", vec![MenuItem::Quit])]);
 
@@ -145,20 +221,30 @@ impl AppDelegate for StatusApp {
         self.window.set_title("Taiko Score Getter 太鼓成绩获取工具");
         self.window.delegate.as_ref().unwrap().layout();
     }
-
-    fn should_terminate_after_last_window_closed(&self) -> bool {
-        true
-    }
 }
 
-impl Dispatcher for StatusApp {
+impl Dispatcher for MainApp {
     type Message = GuiMessage;
 
     fn on_ui_message(&self, msg: Self::Message) {
         let delegate = self.window.delegate.as_ref().unwrap();
         match msg {
-            GuiMessage::Init => {}
+            GuiMessage::CertTrustNeeded => {
+                delegate
+                    .label_launch_proxy
+                    .set_text_color(Color::SystemGreen);
+                delegate
+                    .label_wait_cert_trust
+                    .set_text_color(Color::SystemBlue);
+
+                delegate.label_description.set_text(
+                    "证书已经安装，但是仍然需要手动信任操作，请点击上方按钮查看详细操作指南。",
+                );
+            }
             GuiMessage::WaitForScoreData => {
+                delegate
+                    .label_wait_cert_trust
+                    .set_text_color(Color::SystemGreen);
                 delegate
                     .label_launch_proxy
                     .set_text_color(Color::SystemGreen);
@@ -188,6 +274,7 @@ impl Dispatcher for StatusApp {
             GuiMessage::Close => {
                 self.window.close();
             }
+            _ => {}
         }
     }
 }
@@ -201,29 +288,9 @@ pub fn gui_main(
 
     handle.spawn(async move {
         while let Some(msg) = gui_rx.recv().await {
-            cacao::appkit::App::<StatusApp, GuiMessage>::dispatch_main(msg);
+            cacao::appkit::App::<MainApp, GuiMessage>::dispatch_main(msg);
         }
     });
 
-    let mut win_cfg = WindowConfig::default();
-
-    win_cfg.set_styles(&[WindowStyle::Closable, WindowStyle::Titled]);
-
-    App::new(
-        "net.stevexmh.taikoscoregetter",
-        StatusApp {
-            window: Window::with(
-                win_cfg,
-                MainWindowDelegate {
-                    close_sx,
-                    label_launch_proxy: Label::default(),
-                    label_receive_score: Label::default(),
-                    label_sync_score: Label::default(),
-                    label_description: Label::default(),
-                    content: View::default(),
-                },
-            ),
-        },
-    )
-    .run();
+    App::new("net.stevexmh.taikoscoregetter", MainApp::new(close_sx)).run();
 }

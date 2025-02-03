@@ -23,7 +23,8 @@ use noop::*;
 #[derive(Debug, Clone)]
 pub enum GuiMessage {
     Init,
-    // InitError(String),
+    // 需要信任证书（仅 macOS）
+    CertTrustNeeded,
     WaitForScoreData,
     WaitForScoreSync,
     SendingScoreData,

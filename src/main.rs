@@ -234,10 +234,11 @@ async fn proxy_main(sx: Sender<()>, mut rx: Receiver<()>) {
 
     proxy.start().await.unwrap();
 
-    send_msg_to_gui(GuiMessage::Close);
-
     tracing::info!("正在还原代理配置");
     proxy_configs.recover().await;
+    tracing::info!("代理配置已还原");
+
+    send_msg_to_gui(GuiMessage::Close);
 
     #[cfg(target_os = "macos")]
     {

@@ -11,6 +11,21 @@ pub async fn is_cert_installed() -> bool {
     p.status.success()
 }
 
+pub async fn is_cert_trusted() -> bool {
+    let config_path = crate::get_config_dir();
+    let cer_path = config_path.as_path().join("ca.cer");
+
+    let p = tokio::process::Command::new("security")
+        .arg("verify-cert")
+        .arg("-c")
+        .arg(cer_path.as_path())
+        .output()
+        .await
+        .expect("无法检查证书是否已信任");
+    
+    p.status.success()
+}
+
 pub async fn install_cert() {
     let config_path = crate::get_config_dir();
     let cer_path = config_path.as_path().join("ca.cer");
@@ -28,11 +43,6 @@ pub async fn install_cert() {
     if !p.status.success() {
         panic!("证书安装失败");
     }
-
-    tracing::warn!("证书已安装成功，还有最后一步信任证书需要操作：");
-    tracing::warn!("  1. 打开 钥匙串访问 程序，找到 Taiko Score Getter Certificate 证书");
-    tracing::warn!("  2. 在右上角搜索 Taiko Score Getter Certificate 证书，并双击打开搜索到的证书");
-    tracing::warn!("  3. 展开 信任 栏目，将 使用此证书时 下拉框配置为 完全信任");
 }
 
 #[derive(Debug, Default)]
@@ -115,6 +125,8 @@ impl ProxyConfigs {
                     }
                 }
 
+                tracing::debug!("发现代理配置 {:?}", entry);
+
                 entries.push(entry);
             }
         }
@@ -124,6 +136,8 @@ impl ProxyConfigs {
 
     pub async fn recover(&self) {
         for entry in &self.entries {
+            tracing::debug!("正在还原配置 {:?}", entry);
+
             tokio::process::Command::new("networksetup")
                 .arg("-setwebproxy")
                 .arg(&entry.device)

@@ -13,6 +13,21 @@ pub async fn is_cert_installed() -> bool {
     p.status.success()
 }
 
+pub async fn is_cert_trusted() -> bool {
+    // TODO: 证书信任检查
+    // let p = tokio::process::Command::new("certutil")
+    //     .arg("-store")
+    //     .arg("root")
+    //     .arg("Taiko Score Getter Certificate")
+    //     .creation_flags(0x08000000)
+    //     .output()
+    //     .await
+    //     .expect("无法检查证书是否已信任");
+
+    // p.status.success()
+    true
+}
+
 pub async fn install_cert() {
     let config_path = crate::get_config_dir();
     let cer_path = config_path.as_path().join("ca.cer");

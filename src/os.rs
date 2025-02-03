@@ -92,5 +92,25 @@ pub async fn get_ca() -> RcgenAuthority {
         install_cert().await;
     }
 
+    if !is_cert_trusted().await {
+        tracing::warn!("证书已经安装但未信任，请按照提示操作");
+        #[cfg(target_os = "macos")]
+        {
+            tracing::warn!("证书已安装成功，还有最后一步信任证书需要操作：");
+            tracing::warn!(
+                "  1. 打开 钥匙串访问 程序，找到 Taiko Score Getter Certificate 证书"
+            );
+            tracing::warn!(
+                "  2. 在右上角搜索 Taiko Score Getter Certificate 证书，并双击打开搜索到的证书"
+            );
+            tracing::warn!("  3. 展开 信任 栏目，将 使用此证书时 下拉框配置为 完全信任");
+            tracing::warn!("  详情可以参考 https://github.com/Steve-xmh/taiko-score-getter-rs/blob/main/MACOS.md");
+        }
+        crate::gui::send_msg_to_gui(crate::gui::GuiMessage::CertTrustNeeded);
+        while !is_cert_trusted().await {
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        }
+    }
+
     RcgenAuthority::new(key_pair, cert, 1000, aws_lc_rs::default_provider())
 }
