@@ -26,6 +26,9 @@ ico-builder = "0.1.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cacao = "^0.3.2"
+objc2 = "^0.6"
+objc2-foundation = { version = "^0.3", features = ["NSData"] }
+objc2-app-kit = { version = "^0.3", features = ["NSImage", "NSResponder", "NSApplication"] }
 
 [profile.release]
 strip = true

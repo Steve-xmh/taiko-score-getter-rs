@@ -10,6 +10,8 @@ use cacao::{
     text::Label,
     view::View,
 };
+use objc2::{AllocAnyThread, MainThreadMarker};
+use objc2_app_kit::{NSApplication, NSImage};
 use tokio::{
     runtime::Handle,
     sync::mpsc::{Sender, UnboundedReceiver},
@@ -125,9 +127,18 @@ impl WindowDelegate for MainWindowDelegate {
 
 impl AppDelegate for StatusApp {
     fn did_finish_launching(&self) {
-        App::set_menu(vec![Menu::new("", vec![MenuItem::Quit])]);
+        App::set_menu(vec![Menu::new("Taiko Score Getter", vec![MenuItem::Quit])]);
 
         App::activate();
+
+        let icon_data = include_bytes!("../../assets/icon.png");
+        let icon_data = objc2_foundation::NSData::with_bytes(icon_data);
+        let logo = NSImage::initWithData(NSImage::alloc(), &icon_data).expect("无法加载图片");
+
+        unsafe {
+            let nsapp = NSApplication::sharedApplication(MainThreadMarker::new().unwrap());
+            nsapp.setApplicationIconImage(Some(&logo));
+        }
 
         self.window.set_titlebar_appears_transparent(true);
         self.window.show();
@@ -193,13 +204,10 @@ pub fn gui_main(
             cacao::appkit::App::<StatusApp, GuiMessage>::dispatch_main(msg);
         }
     });
-    
+
     let mut win_cfg = WindowConfig::default();
-    
-    win_cfg.set_styles(&[
-        WindowStyle::Closable,
-        WindowStyle::Titled,
-    ]);
+
+    win_cfg.set_styles(&[WindowStyle::Closable, WindowStyle::Titled]);
 
     App::new(
         "net.stevexmh.taikoscoregetter",
